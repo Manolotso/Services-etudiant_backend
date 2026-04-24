@@ -13,7 +13,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
 
-User = get_user_model()
+User = get_user_model() 
 
 
 
@@ -94,13 +94,47 @@ class ScheduleViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
 
-        if not user.is_authenticated:
-            return Schedule.objects.none()
-
         if getattr(user, "role", None) == "admin":
             return Schedule.objects.all()
 
         return Schedule.objects.filter(user=user)
+
+    def perform_create(self, serializer):
+        user = self.request.user
+
+        if getattr(user, "role", None) == "admin":
+            assigned_user_id = self.request.data.get("user")
+
+            if assigned_user_id:
+                try:
+                    assigned_user = User.objects.get(id=assigned_user_id)
+                except User.DoesNotExist:
+                    assigned_user = user
+
+                serializer.save(user=assigned_user)
+            else:
+                serializer.save(user=user)
+        else:
+            serializer.save(user=user)
+
+##############################################################################################################
+from .models import Course, Room
+from .serializers import CourseSerializer, RoomSerializer
+from rest_framework import viewsets
+
+
+
+class CourseViewSet(viewsets.ModelViewSet):
+    queryset = Course.objects.all()
+    serializer_class = CourseSerializer
+    permission_classes = [IsAuthenticated]
+
+################################################################################################################
+
+class RoomViewSet(viewsets.ModelViewSet):
+    queryset = Room.objects.all()
+    serializer_class = RoomSerializer
+    permission_classes = [IsAuthenticated]
     
 ###########################################################################################################
 
@@ -234,3 +268,28 @@ class HelpResponseViewSet(viewsets.ModelViewSet):
         response.is_accepted = True
         response.save()
         return Response({"message": "Réponse acceptée"})
+    
+
+from django.contrib.auth import get_user_model
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+User = get_user_model()
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_users(request):
+    users = User.objects.all()
+
+    data = [
+        {
+            "id": u.id,
+            "email": u.email,
+            "custom_username": u.custom_username,
+            "role": getattr(u, "role", None)
+        }
+        for u in users
+    ]
+
+    return Response(data)

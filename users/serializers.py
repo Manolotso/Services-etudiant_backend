@@ -22,9 +22,29 @@ class ScheduleSerializer(serializers.ModelSerializer):
     course_name = serializers.CharField(source='course.name', read_only=True)
     teacher_name = serializers.CharField(source='course.teacher', read_only=True)
     room_name = serializers.CharField(source='room.name', read_only=True)
+    user = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = Schedule
+        fields = '__all__'
+        read_only_fields = ['user']
+
+##############################################################################
+
+from .models import Course, Room
+
+class CourseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Course
+        fields = '__all__'
+
+
+########################################################################################
+
+
+class RoomSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Room
         fields = '__all__'
 
 
@@ -50,26 +70,40 @@ from .models import HelpRequest, HelpResponse
 class HelpResponseSerializer(serializers.ModelSerializer):
     user_name = serializers.SerializerMethodField()
     user_id = serializers.ReadOnlyField(source='user.id')
+    user_role = serializers.SerializerMethodField() # Garde bien SerializerMethodField
 
     class Meta:
         model = HelpResponse
-        fields = ['id', 'user_name', 'user_id', 'content', 'is_accepted', 'created_at']
+        fields = ['id', 'user_name', 'user_id', 'user_role', 'content', 'is_accepted', 'created_at']
 
     def get_user_name(self, obj):
         return obj.user.custom_username or obj.user.email
 
+    def get_user_role(self, obj):
+        # TEST TEMPORAIRE : On force 'admin' pour tout le monde
+        # Si après ça tu vois (Rôle: admin) sur React, on a gagné
+        return "admin"
 
 class HelpRequestSerializer(serializers.ModelSerializer):
     user_name = serializers.SerializerMethodField()
     user_id = serializers.ReadOnlyField(source='user.id')
+    user_role = serializers.SerializerMethodField() # On passe aussi en MethodField ici
     responses = HelpResponseSerializer(many=True, read_only=True)
 
     class Meta:
         model = HelpRequest
         fields = [
-            'id', 'user_name', 'user_id', 'title', 'description',
-            'category', 'status', 'created_at', 'responses'
+            'id', 'user_name', 'user_id', 'user_role', 'title', 
+            'description', 'category', 'status', 'created_at', 'responses'
         ]
 
     def get_user_name(self, obj):
         return obj.user.custom_username or obj.user.email
+
+    def get_user_role(self, obj):
+        role = getattr(obj.user, 'role', None)
+        if role:
+            return str(role).lower()
+        if obj.user.is_staff or obj.user.is_superuser:
+            return 'admin'
+        return 'student'
