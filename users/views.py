@@ -146,3 +146,91 @@ class JobScraperViewSet(viewsets.ModelViewSet):
         # Code 201 : Nouveau job ajouté
         serializer = self.get_serializer(job)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+
+
+
+
+############################################################################################################
+from rest_framework import viewsets, permissions, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.exceptions import PermissionDenied
+
+
+
+
+from rest_framework import serializers
+from .models import HelpRequest, HelpResponse
+
+
+class HelpResponseSerializer(serializers.ModelSerializer):
+    user_name = serializers.SerializerMethodField()
+    user_id = serializers.ReadOnlyField(source='user.id')
+
+    class Meta:
+        model = HelpResponse
+        fields = ['id', 'user_name', 'user_id', 'content', 'is_accepted', 'created_at']
+
+    def get_user_name(self, obj):
+        return obj.user.custom_username or obj.user.email
+
+
+class HelpRequestSerializer(serializers.ModelSerializer):
+    user_name = serializers.SerializerMethodField()
+    user_id = serializers.ReadOnlyField(source='user.id')
+    responses = HelpResponseSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = HelpRequest
+        fields = [
+            'id', 'user_name', 'user_id', 'title', 'description',
+            'category', 'status', 'created_at', 'responses'
+        ]
+
+    def get_user_name(self, obj):
+        return obj.user.custom_username or obj.user.email
+
+
+# ✅ CLASSE MANQUANTE — ajoutée ici
+class HelpRequestViewSet(viewsets.ModelViewSet):
+    queryset = HelpRequest.objects.all().order_by('-created_at')
+    serializer_class = HelpRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def respond(self, request, pk=None):
+        help_request = self.get_object()
+        serializer = HelpResponseSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=request.user, help_request=help_request)
+            return Response(serializer.data, status=201)
+        return Response(serializer.errors, status=400)
+
+    @action(detail=True, methods=['post'])
+    def resolve(self, request, pk=None):
+        help_request = self.get_object()
+        if help_request.user != request.user:
+            return Response({"error": "Non autorisé"}, status=status.HTTP_403_FORBIDDEN)
+        help_request.status = 'resolved'
+        help_request.save()
+        return Response({"message": "Demande résolue"})
+
+
+class HelpResponseViewSet(viewsets.ModelViewSet):
+    queryset = HelpResponse.objects.all()
+    serializer_class = HelpResponseSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=True, methods=['post'])
+    def accept(self, request, pk=None):
+        response = self.get_object()
+        if response.help_request.user != request.user:
+            raise PermissionDenied("Vous ne pouvez pas accepter cette réponse.")
+        HelpResponse.objects.filter(help_request=response.help_request).update(is_accepted=False)
+        response.is_accepted = True
+        response.save()
+        return Response({"message": "Réponse acceptée"})

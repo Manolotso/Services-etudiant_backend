@@ -7,7 +7,9 @@ from .views import (
     register,
     CustomTokenObtainPairView,
     complete_profile,
-    JobScraperViewSet
+    JobScraperViewSet,
+    HelpRequestViewSet,
+    HelpResponseViewSet
 )
 
 from rest_framework_simplejwt.views import TokenRefreshView
@@ -18,6 +20,10 @@ router.register(r'schedule', ScheduleViewSet, basename='schedule')
 router.register(r'jobs', JobViewSet, basename='jobs')
 
 router.register(r'scraper/jobs', JobScraperViewSet, basename='scraper-jobs')
+
+router.register(r'help', HelpRequestViewSet, basename='help')
+
+router.register(r'responses', HelpResponseViewSet, basename='responses')
 
 urlpatterns = [
     # 🔐 AUTHENTIFICATION

@@ -38,3 +38,38 @@ class JobSerializer(serializers.ModelSerializer):
     class Meta:
         model = Job
         fields = '__all__'
+
+    
+
+#############################################################################
+
+
+from rest_framework import serializers
+from .models import HelpRequest, HelpResponse
+
+class HelpResponseSerializer(serializers.ModelSerializer):
+    user_name = serializers.SerializerMethodField()
+    user_id = serializers.ReadOnlyField(source='user.id')
+
+    class Meta:
+        model = HelpResponse
+        fields = ['id', 'user_name', 'user_id', 'content', 'is_accepted', 'created_at']
+
+    def get_user_name(self, obj):
+        return obj.user.custom_username or obj.user.email
+
+
+class HelpRequestSerializer(serializers.ModelSerializer):
+    user_name = serializers.SerializerMethodField()
+    user_id = serializers.ReadOnlyField(source='user.id')
+    responses = HelpResponseSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = HelpRequest
+        fields = [
+            'id', 'user_name', 'user_id', 'title', 'description',
+            'category', 'status', 'created_at', 'responses'
+        ]
+
+    def get_user_name(self, obj):
+        return obj.user.custom_username or obj.user.email

@@ -44,7 +44,7 @@ class User(AbstractUser):
     objects = UserManager()   # 🔥 IMPORTANT
 
     def __str__(self):
-        return self.email
+        return self.custom_username if self.custom_username else self.email
     
 #############################################
 
@@ -133,5 +133,51 @@ class Job(models.Model):
 
     def __str__(self):
         return f"{self.title} - {self.company}"
+    
+
+####################################################################################################
+
+
+class HelpRequest(models.Model):
+    STATUS_CHOICES = [
+        ('open', 'Open'),
+        ('resolved', 'Resolved'),
+    ]
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+
+    category = models.CharField(max_length=100, blank=True, null=True)
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.title} - {self.user}"
+    
+
+
+
+class HelpResponse(models.Model):
+    help_request = models.ForeignKey(
+        HelpRequest,
+        on_delete=models.CASCADE,
+        related_name='responses'
+    )
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+
+    content = models.TextField()
+
+    is_accepted = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Response by {self.user}"
     
     
